@@ -39,7 +39,41 @@ npm run sample                # writes data/{master,agent,annual_report}.txt
 npm run leads -- extract --input data --out output/leads.csv --json
 ```
 
-## Usage
+## Two ways to get data
+
+|        | Bulk file (`extract`)  | Live scrape (`scrape`)                 |
+| ------ | ---------------------- | -------------------------------------- |
+| Source | Official SOS data file | Live search site, real browser         |
+| Effort | One phone call         | Run on your machine, confirm selectors |
+| Risk   | None                   | ToS violation; WAF may throttle/block  |
+| Scale  | Whole state at once    | Slow (polite throttle), page by page   |
+
+## Live scrape (`scrape`)
+
+`apps.ilsos.gov` is behind an Akamai-class WAF — plain HTTP scraping is blocked
+(403 / TLS reset). So the scraper drives **real Chromium** via Playwright, throttled
+to look human, and must run on a **residential IP** (not a datacenter/VPN).
+
+```bash
+npm run scrape:setup                          # one-time: download Chromium
+npm run scrape -- --out output/leads.csv \
+      [--max 50] [--min-delay 3000] [--max-delay 7000] [--headless] [--mail-to officer]
+```
+
+Run **headed** (default) the first time. If a bot challenge appears, solve it once in
+the window — the persistent profile (`.chromium-profile/`) keeps you cleared. Results
+stream to a `.jsonl` checkpoint as they're found, so a block/crash loses nothing; re-run
+the same command to resume.
+
+**First-run selector check:** the DOM selectors in `src/scrape/selectors.ts` are a
+documented best-effort (the WAF blocked the build sandbox, so they're unverified).
+Open the search page in DevTools, confirm each selector, and fix any that are off —
+they're all in that one file, no logic changes needed.
+
+If your IP starts getting blocked, raise the delays — don't add proxy rotation. At that
+point the bulk file (below) is the saner path.
+
+## Usage (`extract`, file-based)
 
 ```bash
 # Build the lead list (CSV, + JSON with --json)

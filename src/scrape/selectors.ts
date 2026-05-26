@@ -40,18 +40,21 @@ export interface SiteConfig {
   };
 }
 
-// Best-effort defaults for the modern apps.ilsos.gov/businessentitysearch app.
-// VERIFY THESE LIVE before trusting output.
+// SEARCH-FORM selectors are VERIFIED against the live DOM (2026-05): the form posts
+// to /businessentitysearch/businessentitysearch with hidden command=entitySearch &
+// method=search; searchMethod is a radio group (#keyWord = keyword search) and the
+// term goes in #searchValue. Submitting triggers a reCAPTCHA Enterprise challenge, so
+// the scraper PAUSES for a human to solve it (see ilsos.ts).
+// RESULTS + DETAIL selectors are BEST-EFFORT: the reCAPTCHA blocked observation of
+// those pages, so confirm them in DevTools on the first human-assisted run.
 export const IL: SiteConfig = {
   searchUrl: "https://apps.ilsos.gov/businessentitysearch/",
-  searchInput:
-    "input[name*='SearchText'], input#SearchText, input[type='text']",
-  searchTypeNameRadio:
-    "input[value='Name'], input[name*='SearchType'][value*='ame']",
-  searchSubmit: "button[type='submit'], input[type='submit'], #btnSearch",
-  resultRow: "table tbody tr",
-  resultLink: "a",
-  nextPage: "a[rel='next'], a.next, a[aria-label='Next']",
+  searchInput: "#searchValue", // VERIFIED
+  searchTypeNameRadio: "#keyWord", // VERIFIED: keyword search radio
+  searchSubmit: "", // VERIFIED: submit via Enter in #searchValue (no stable button id)
+  resultRow: "table tbody tr, .search-results tr, .result", // best-effort
+  resultLink: "a", // best-effort
+  nextPage: "a[rel='next'], a.next, a[aria-label='Next'], a:has-text('Next')", // best-effort
   detail: {
     entityName: "#entityName, [data-field='name'], h1",
     fileNumber: "#fileNumber, [data-field='fileNumber']",

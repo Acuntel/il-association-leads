@@ -12,6 +12,7 @@ export interface ScrapeOptions {
   maxDelayMs: number; // throttle ceiling (jitter picks within [min,max])
   keywords: string[];
   maxPerKeyword: number; // 0 = no cap
+  humanSolveTimeoutMs: number; // how long to wait for a human to clear a reCAPTCHA
   resumeKeys?: string[]; // file numbers already done in a prior run (skip them)
   onLead: (lead: Lead) => void; // stream results out (so a crash keeps progress)
   onSkip: (fileNumber: string, reason: string) => void;
@@ -58,6 +59,41 @@ async function scrapeDetail(
   };
 }
 
+// Poll until entity result links appear. If a reCAPTCHA/bot wall is detected, print a
+// one-time prompt so the operator can solve it in the visible window, then keep waiting.
+async function waitForResults(
+  page: Page,
+  cfg: SiteConfig,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let prompted = false;
+  for (;;) {
+    const count = await page
+      .locator(`${cfg.resultRow} ${cfg.resultLink}`)
+      .count()
+      .catch(() => 0);
+    if (count > 0) return true;
+    const body = (
+      (await page
+        .locator("body")
+        .textContent()
+        .catch(() => "")) ?? ""
+    ).toLowerCase();
+    if (
+      !prompted &&
+      /not a robot|solve this quick test|recaptcha|are a person/.test(body)
+    ) {
+      process.stderr.write(
+        "\n>>> reCAPTCHA shown. Solve it in the open Chrome window; the scraper will continue automatically.\n",
+      );
+      prompted = true;
+    }
+    if (Date.now() > deadline) return false;
+    await page.waitForTimeout(2000);
+  }
+}
+
 async function searchKeyword(
   context: BrowserContext,
   cfg: SiteConfig,
@@ -67,6 +103,7 @@ async function searchKeyword(
 ): Promise<void> {
   const page = await context.newPage();
   await page.goto(cfg.searchUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1500);
   if (cfg.searchTypeNameRadio) {
     await page
       .locator(cfg.searchTypeNameRadio)
@@ -75,8 +112,24 @@ async function searchKeyword(
       .catch(() => {});
   }
   await page.locator(cfg.searchInput).first().fill(keyword);
-  await page.locator(cfg.searchSubmit).first().click();
-  await page.waitForLoadState("networkidle").catch(() => {});
+  // Submit: click the configured button, else press Enter in the field.
+  if (cfg.searchSubmit)
+    await page
+      .locator(cfg.searchSubmit)
+      .first()
+      .click()
+      .catch(() => {});
+  else await page.locator(cfg.searchInput).first().press("Enter");
+  // Submit triggers reCAPTCHA Enterprise — wait (and prompt) until a human clears it.
+  const ok = await waitForResults(page, cfg, opts.humanSolveTimeoutMs);
+  if (!ok) {
+    opts.onSkip(
+      `keyword:${keyword}`,
+      "no results / reCAPTCHA not cleared in time",
+    );
+    await page.close();
+    return;
+  }
 
   let collected = 0;
   for (;;) {
@@ -124,12 +177,18 @@ async function searchKeyword(
   await page.close();
 }
 
-// Drive a real Chromium through the live search, one keyword at a time, politely
+// Drive real Chrome through the live search, one keyword at a time, politely
 // throttled. Streams each Lead out via opts.onLead so a mid-run block loses nothing.
+//
+// IMPORTANT: the IL SOS WAF blocks headless browsers (verified: headless -> 403).
+// We launch the installed Google Chrome (channel "chrome") headed, with the
+// automation flag disabled — that combination loads the real page (verified 200).
 export async function scrapeIl(opts: ScrapeOptions): Promise<void> {
   const cfg = IL;
   const context = await chromium.launchPersistentContext(opts.profileDir, {
     headless: opts.headless,
+    channel: "chrome",
+    args: ["--disable-blink-features=AutomationControlled"],
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 900 },

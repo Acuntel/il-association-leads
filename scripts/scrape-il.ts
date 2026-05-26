@@ -59,6 +59,7 @@ async function main(): Promise<void> {
     maxDelayMs: parseInt(flag("max-delay", "7000"), 10),
     keywords: [],
     maxPerKeyword: parseInt(flag("max", "0"), 10),
+    humanSolveTimeoutMs: parseInt(flag("solve-timeout", "300000"), 10),
     resumeKeys,
     onLead: (lead) => {
       leads.push(lead);

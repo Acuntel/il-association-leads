@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "leads": "tsx src/cli.ts",
+    "pdf": "tsx scripts/make-pdf.ts",
     "scrape": "tsx scripts/scrape-il.ts",
     "scrape:setup": "playwright install chromium",
     "sample": "tsx scripts/make-sample.ts",

@@ -7,6 +7,7 @@ data/*.txt
 output/*.csv
 output/*.json
 output/*.jsonl
+output/*.pdf
 
 # Keep the empty dirs in git.
 !data/.gitkeep

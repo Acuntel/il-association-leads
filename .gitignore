@@ -1,10 +1,12 @@
 node_modules/
 dist/
+.chromium-profile/
 
 # Licensed SOS bulk data and generated outputs — never commit these.
 data/*.txt
 output/*.csv
 output/*.json
+output/*.jsonl
 
 # Keep the empty dirs in git.
 !data/.gitkeep

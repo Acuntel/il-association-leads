@@ -71,8 +71,11 @@ async function main(): Promise<void> {
     profileDir: flag("profile", ".chromium-profile"),
     headless: has("headless"),
     humanSolveTimeoutMs: parseInt(flag("solve-timeout", "300000"), 10),
+    detailTimeoutMs: parseInt(flag("detail-timeout", "25000"), 10),
     keywords,
     includeInactive: has("include-inactive"),
+    enrich: !has("no-enrich"),
+    maxPerKeyword: parseInt(flag("max", "0"), 10),
     onLead: (lead) => {
       if (seen.has(lead.fileNumber)) return;
       seen.add(lead.fileNumber);

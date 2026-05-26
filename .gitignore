@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Licensed SOS bulk data and generated outputs — never commit these.
+data/*.txt
+output/*.csv
+output/*.json
+
+# Keep the empty dirs in git.
+!data/.gitkeep
+!output/.gitkeep

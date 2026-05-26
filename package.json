@@ -1,0 +1,26 @@
+{
+  "name": "il-association-leads",
+  "version": "1.0.0",
+  "description": "Extract condominium/townhome/homeowner association leads from the official Illinois SOS bulk corporate data file. No scraping.",
+  "type": "module",
+  "bin": {
+    "leads": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "leads": "tsx src/cli.ts",
+    "sample": "tsx scripts/make-sample.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

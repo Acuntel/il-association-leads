@@ -1,0 +1,56 @@
+{
+  "state": "IL",
+  "label": "Illinois SOS bulk corporate/NFP data",
+  "specNote": "OFFSETS BELOW ARE BEST-EFFORT. The real IL SOS file uses fixed 119-char records (spec PDF version 001, 2022-09-29: ilsos.gov/data/bs/proc_corp_data.pdf). Order the file from Dept. of Business Services, 217-782-6961, then transcribe the official field positions here. The parser is fully driven by this file — correcting offsets requires NO code changes. Fields are [startColumn (1-based), length].",
+  "recordLength": 119,
+  "nfpEntityTypes": ["NFP"],
+  "activeStatuses": ["AC", "GS", "GD"],
+  "inactiveStatuses": ["DS", "WD", "RV", "IN"],
+  "combinedFile": null,
+  "datasets": {
+    "master": {
+      "source": { "file": "master.txt" },
+      "fields": {
+        "fileNumber": [1, 8],
+        "entityName": [9, 60],
+        "entityType": [69, 4],
+        "status": [73, 2],
+        "incorporationDate": [75, 8],
+        "anniversaryMonth": [83, 2],
+        "entityStreet": [85, 40],
+        "entityCity": [125, 30],
+        "entityState": [155, 2],
+        "entityZip": [157, 9]
+      }
+    },
+    "agent": {
+      "source": { "file": "agent.txt" },
+      "fields": {
+        "fileNumber": [1, 8],
+        "agentName": [9, 40],
+        "agentStreet": [49, 40],
+        "agentCity": [89, 30],
+        "agentState": [119, 2],
+        "agentZip": [121, 9]
+      }
+    },
+    "annualReport": {
+      "source": { "file": "annual_report.txt" },
+      "recencyField": "reportYear",
+      "fields": {
+        "fileNumber": [1, 8],
+        "reportYear": [9, 4],
+        "presidentName": [13, 40],
+        "presidentStreet": [53, 40],
+        "presidentCity": [93, 30],
+        "presidentState": [123, 2],
+        "presidentZip": [125, 9],
+        "secretaryName": [134, 40],
+        "secretaryStreet": [174, 40],
+        "secretaryCity": [214, 30],
+        "secretaryState": [244, 2],
+        "secretaryZip": [246, 9]
+      }
+    }
+  }
+}

@@ -12,3 +12,5 @@ output/*.pdf
 # Keep the empty dirs in git.
 !data/.gitkeep
 !output/.gitkeep
+
+.tmp/

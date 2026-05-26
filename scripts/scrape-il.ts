@@ -1,14 +1,17 @@
-// Live scraper entry point. Drives a real Chromium through the IL SOS search,
-// streams Leads to a crash-safe JSONL checkpoint, and writes a final CSV.
+// Live scraper entry point. Drives real Chrome through the IL SOS business entity
+// search, parses the results table, and writes a CSV (+ crash-safe JSONL checkpoint).
 //
-// MUST run on a machine with a residential IP and a real browser:
-//   npm run scrape:setup           # one-time: download Chromium
-//   npm run scrape -- --out output/leads.csv [--headless] [--max 50] [--min-delay 3000] [--max-delay 7000]
+//   npm run scrape:setup      # one-time: download Chromium (or rely on installed Chrome)
+//   npm run scrape -- --out output/leads.csv [--headless] [--include-inactive]
+//                     [--keywords "condominium,townhome,townhouse,homeowner"]
 //
-// apps.ilsos.gov is behind an Akamai-class WAF. Run headed (default) the first
-// time, and if a bot challenge appears, solve it once in the opened window — the
-// persistent profile keeps you cleared. Keep delays high; if you start getting
-// blocked, raise them rather than hammering.
+// Notes (all verified live, 2026-05):
+//  - apps.ilsos.gov blocks headless browsers, so we launch real Chrome headed.
+//  - The search uses the "Partial Word" method (matches a word anywhere in the name);
+//    "Keyword" only matches name prefixes and misses mid-name phrases.
+//  - The first search may show a reCAPTCHA; solve it once in the window and the
+//    persistent profile stays cleared for the rest of the run.
+//  - IL caps each search at 100 rows, so we sweep several partial words and dedupe.
 import {
   appendFileSync,
   existsSync,
@@ -18,8 +21,8 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { loadLayout } from "../src/layout.js";
-import { leadsToCsv } from "../src/output.js";
-import { scrapeIl } from "../src/scrape/ilsos.js";
+import { leadsToCsv, leadsToJson } from "../src/output.js";
+import { scrapeIlTable } from "../src/scrape/run.js";
 import type { Lead, MailTo } from "../src/types.js";
 
 function flag(name: string, fallback: string): string {
@@ -28,49 +31,66 @@ function flag(name: string, fallback: string): string {
 }
 const has = (name: string) => process.argv.includes(`--${name}`);
 
+const DEFAULT_KEYWORDS = [
+  "condominium",
+  "townhome",
+  "townhouse",
+  "homeowner",
+  "owners",
+];
+
 async function main(): Promise<void> {
   const out = flag("out", "output/leads.csv");
   const checkpoint = out.replace(/\.csv$/, "") + ".jsonl";
   const layout = loadLayout(flag("layout", "layouts/il.json"));
   const mailTo: MailTo =
     flag("mail-to", "entity") === "officer" ? "officer" : "entity";
+  const keywords = flag("keywords", DEFAULT_KEYWORDS.join(","))
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
 
   mkdirSync(dirname(out), { recursive: true });
 
-  // Resume: reload any leads already captured in a prior run.
   const leads: Lead[] = [];
-  const resumeKeys: string[] = [];
+  const seen = new Set<string>();
   if (existsSync(checkpoint)) {
     for (const line of readFileSync(checkpoint, "utf8").split("\n")) {
       if (!line.trim()) continue;
       const lead = JSON.parse(line) as Lead;
+      if (seen.has(lead.fileNumber)) continue;
+      seen.add(lead.fileNumber);
       leads.push(lead);
-      resumeKeys.push(lead.fileNumber);
     }
     process.stdout.write(`Resuming: ${leads.length} leads already captured.\n`);
   }
 
-  await scrapeIl({
+  await scrapeIlTable({
     layout,
     mailTo,
     profileDir: flag("profile", ".chromium-profile"),
     headless: has("headless"),
-    minDelayMs: parseInt(flag("min-delay", "3000"), 10),
-    maxDelayMs: parseInt(flag("max-delay", "7000"), 10),
-    keywords: [],
-    maxPerKeyword: parseInt(flag("max", "0"), 10),
     humanSolveTimeoutMs: parseInt(flag("solve-timeout", "300000"), 10),
-    resumeKeys,
+    keywords,
+    includeInactive: has("include-inactive"),
     onLead: (lead) => {
+      if (seen.has(lead.fileNumber)) return;
+      seen.add(lead.fileNumber);
       leads.push(lead);
-      appendFileSync(checkpoint, JSON.stringify(lead) + "\n"); // crash-safe
+      appendFileSync(checkpoint, JSON.stringify(lead) + "\n");
       process.stdout.write(`  + ${lead.entityName} (${lead.fileNumber})\n`);
     },
     onSkip: (key, reason) =>
       process.stdout.write(`  - skip ${key}: ${reason}\n`),
+    onStatus: (msg) => process.stdout.write(`${msg}\n`),
   });
 
   writeFileSync(out, leadsToCsv(leads), "utf8");
+  writeFileSync(
+    out.replace(/\.csv$/, "") + ".json",
+    leadsToJson(leads),
+    "utf8",
+  );
   process.stdout.write(`\nWrote ${leads.length} leads -> ${out}\n`);
 }
 
